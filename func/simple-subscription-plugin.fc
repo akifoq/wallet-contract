@@ -1,6 +1,5 @@
 ;; Simple subscription plugin for wallet-v4
 ;; anyone can ask to send a subscription payment
-;; if payment request fails, the subscription is canceled
 
 (int) slice_data_equal?(slice s1, slice s2) asm "SDEQ";
 
@@ -82,6 +81,12 @@
   send_raw_message(msg.end_cell(), 3);
 }
 
+(int, cell) request_payment_code_func(slice data) inline {
+    int amount = data~load_grams();
+    return (amount, null());
+}
+cell request_payment_code() asm "<{ request_payment_code_func INLINECALL }>c PUSHREF";
+
 () request_payment(slice wallet, int amount) impure inline_ref {
   var msg = begin_cell().store_uint(0x18, 6)
                         .store_slice(wallet)
@@ -89,8 +94,8 @@
                         .store_uint(0, 1 + 4 + 4 + 64 + 32 + 1 + 1)
                         .store_uint(0x706c7567, 32) ;; request op
                         .store_uint(cur_lt(), 64) ;; query_id
-                        .store_grams(amount)
-                        .store_uint(0, 1); ;; empty extra
+                        .store_ref(request_payment_code())
+                        .store_grams(amount);
   send_raw_message(msg.end_cell(), 3);
 }
 
